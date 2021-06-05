@@ -1,0 +1,125 @@
+
+module BCD (
+input [12:0] num,
+output reg [3:0] Thousands,
+output reg [3:0] Hundreds,
+output reg [3:0] Tens,
+output reg [3:0] Ones
+);
+integer i;
+
+    always @(num)
+      begin
+    //initialization
+        Thousands = 4'd0;
+        Hundreds = 4'd0;
+        Tens = 4'd0;
+        Ones = 4'd0;
+        for (i = 12; i >= 0 ; i = i-1 )
+            begin
+            // 0000 0000 0000 1100     (num):12 digits 
+            if(Thousands>=5) 
+            Thousands =  Thousands+3;
+            if(Hundreds >= 5 )
+            Hundreds = Hundreds + 3;
+            if (Tens >= 5 )
+            Tens = Tens + 3;
+            if (Ones >= 5)
+            Ones = Ones +3;
+            //shift left one
+            Thousands = Thousands <<1; 
+            Thousands[0] = Hundreds[3]; 
+            Hundreds = Hundreds << 1;
+            Hundreds [0] = Tens [3];
+            Tens = Tens << 1;
+            Tens [0] = Ones[3];
+            Ones = Ones << 1;
+            Ones[0] = num[i];
+            end
+        end
+endmodule
+
+
+
+
+module Four_Digit_Seven_Segment_Driver_Optimized (
+    input clk,
+     input uart_in,
+    output reg [3:0] Anode,
+    output reg [6:0] LED_out,
+    output [15:0]leds
+);
+
+    wire [1:0] ledSel;
+    wire [3:0] ssdSel;
+    reg [3:0] LED_BCD;
+    reg [19:0] refresh_counter = 0; // 20-bit counter
+    wire [1:0] LED_activating_counter;
+
+wire [12:0] ssd;
+//wire temp_clk = clk;
+
+//Exp1( temp_clk,  reset, ledSel, ssdSel, ssd_clk, leds, ssd);
+wire [7:0]outp; 
+ UART_receiver_multiple_Keys uar(clk,uart_in,outp);
+/*wire reset; 
+assign ledSel = outp[1:0];
+assign ssdSel = outp[5:2];
+assign reset = outp[6];
+*/
+processor p( outp[7],outp[6], outp[1:0], outp[5:2], leds, ssd);
+
+
+
+always @(posedge clk)
+    begin
+    refresh_counter <= refresh_counter + 1;
+    end
+assign LED_activating_counter = refresh_counter[19:18];
+
+wire [3:0] th;
+wire [3:0] hun;
+wire [3:0] ten;
+wire [3:0] one;
+BCD(ssd, th, hun, ten, one);
+
+always @(*)
+begin
+case(LED_activating_counter)
+    2'b00: begin
+        Anode = 4'b0111;
+        LED_BCD = th;
+    end
+    2'b01: begin
+        Anode = 4'b1011;
+        LED_BCD = hun;
+    end
+    2'b10: begin
+        Anode = 4'b1101;
+        LED_BCD = ten;
+    end
+    2'b11: begin
+        Anode = 4'b1110;
+        LED_BCD = one;
+    end
+endcase
+end
+
+always @(*)
+begin
+    case(LED_BCD)
+        4'b0000: LED_out = 7'b0000001; // "0"
+        4'b0001: LED_out = 7'b1001111; // "1"
+        4'b0010: LED_out = 7'b0010010; // "2"
+        4'b0011: LED_out = 7'b0000110; // "3"
+        4'b0100: LED_out = 7'b1001100; // "4"
+        4'b0101: LED_out = 7'b0100100; // "5"
+        4'b0110: LED_out = 7'b0100000; // "6"
+        4'b0111: LED_out = 7'b0001111; // "7"
+        4'b1000: LED_out = 7'b0000000; // "8"
+        4'b1001: LED_out = 7'b0000100; // "9"
+        default: LED_out = 7'b0000001; // "0"
+    endcase
+end
+endmodule
+
